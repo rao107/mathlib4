@@ -209,22 +209,19 @@ variable {X : Ω → ℝ}
 /-- **Expectation of a binomial random variable**.
 
 The expectation of a binomial random variable with parameters `n` and `p` is `pn`. -/
-lemma IsBinomial.integral_eq (hX : IsBinomial X n p P) : P[X] = p.val * n := by
-  rw [HasLaw.integral_eq hX, binomial, integral_map] <;> sorry
+proof_wanted IsBinomial.integral_eq (hX : IsBinomial X n p P) : P[X] = p.val * n
 
 /-- **Variance of a binomial random variable**.
 
 The variance of a binomial random variable with parameters `n` and `p` is `p(1 - p)n`. -/
-lemma IsBinomial.variance_eq (hX : HasLaw X μ P) : Var[X; P] = p * (1 - p) * n :=
-  sorry
+proof_wanted IsBinomial.variance_eq (hX : HasLaw X μ P) : Var[X; P] = p * (1 - p) * n
 
 /-- **Conditional variance of a binomial random variable**.
 
 The conditional variance of a binomial random variable is the product of the conditional
 probabilities that it's equal to `0` and that it's equal to `1`. -/
-lemma IsBinomial.condVar_eq {m₀ : MeasurableSpace Ω} (hm : m ≤ m₀) {P : Measure[m₀] Ω}
+proof_wanted IsBinomial.condVar_eq {m₀ : MeasurableSpace Ω} (hm : m ≤ m₀) {P : Measure[m₀] Ω}
     (hX : HasLaw X μ P) :
-    Var[X; P | m] =ᵐ[P] P[X | m] * P[1 - X | m] :=
-  sorry
+    Var[X; P | m] =ᵐ[P] P[X | m] * P[1 - X | m]
 
 end ProbabilityTheory
