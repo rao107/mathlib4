@@ -7,6 +7,7 @@ module
 
 public import Mathlib.Probability.CondVar
 public import Mathlib.Probability.Distributions.SetBernoulli
+public import Mathlib.Probability.Moments.ComplexMGF
 public import Mathlib.Probability.Moments.Variance
 public import Mathlib.Probability.HasLaw
 
@@ -201,6 +202,75 @@ lemma IsBinomial.ae_mem_image_natCast_Iic [MeasurableSingletonClass R]
 
 lemma IsBinomial.ae_le {X : Ω → ℕ} (hX : IsBinomial X n p P) : ∀ᵐ ω ∂P, X ω ≤ n := by
   simpa using hX.ae_mem_image_natCast_Iic
+
+namespace CharacteristicFunction
+
+open scoped Real
+
+open Complex
+
+-- TODO: okay this is really hard. let's come back to this later...
+theorem complexMGF_id_binomial (z : ℂ) :
+    complexMGF id (binomial n p) z = (1 - p + p * cexp z) ^ n := by
+  calc complexMGF id (binomial n p) z
+    _ = ∫ k, cexp (z * k) ∂Bin(ℝ, n, p) := by
+      simp only [complexMGF, id_eq]
+    _ = ∫ s, cexp (z * Set.ncard s) ∂setBer(Set.Iio n, p) := by
+      rw [binomial, integral_map (by fun_prop) (by fun_prop)]
+      simp only [Function.comp_apply, ofReal_natCast]
+    _ = (1 - p + p * cexp z) ^ n := by sorry
+
+theorem complexMGF_binomial {X : Ω → ℝ} (hX : P.map X = binomial n p) (z : ℂ) :
+    complexMGF X P z = (1 - p + p * cexp z) ^ n := by
+  have hX_meas : AEMeasurable X P := aemeasurable_of_map_neZero (by rw [hX]; infer_instance)
+  rw [← complexMGF_id_map hX_meas, hX, complexMGF_id_binomial]
+
+theorem charFun_binomial (t : ℝ) :
+    charFun (binomial n p) t = (1 - p + p * (cexp (t * «I»))) ^ n := by
+  rw [← complexMGF_id_mul_I, complexMGF_id_binomial (t * «I»)]
+
+theorem mgf_binomial {X : Ω → ℝ} (hX : P.map X = binomial n p) (t : ℝ) :
+    mgf X P t = (1 - p + p * rexp t) ^ n := by
+  suffices (mgf X P t : ℂ) = (1 - p + p * rexp t) ^ n from mod_cast this
+  have hX_meas : AEMeasurable X P :=
+    aemeasurable_of_map_neZero (by rw [hX]; exact isProbabilityMeasure_binomial.neZero)
+  rw [← mgf_id_map hX_meas, ← complexMGF_ofReal, hX, complexMGF_id_binomial]
+  norm_cast
+
+theorem mgf_fun_id_binomial :
+    mgf (fun x ↦ x) (binomial n p) = fun t ↦ (1 - p + p * rexp t) ^ n := by
+  ext t
+  exact mgf_binomial (by simp) t
+
+theorem mgf_id_binomial :
+    mgf id (binomial n p) = fun t ↦ (1 - p + p * rexp t) ^ n :=
+  mgf_fun_id_binomial
+
+theorem cgf_binomial {X : Ω → ℝ} (hX : P.map X = binomial n p) (t : ℝ) :
+    cgf X P t = n * Real.log (1 - p + p * rexp t) := by
+  rw [cgf, mgf_binomial hX t, Real.log_pow]
+
+lemma integrable_exp_mul_binomial (t : ℝ) :
+    Integrable (fun x ↦ rexp (t * x)) (binomial n p) := by
+  rw [← mgf_pos_iff, mgf_fun_id_binomial]
+  exact pow_pos (by
+    rcases eq_or_lt_of_le (unitInterval.nonneg p) with hp | hp
+    · simp [← hp]
+    · linarith [sub_nonneg.mpr (show (p : ℝ) ≤ 1 from unitInterval.le_one p),
+        mul_pos hp (Real.exp_pos t)]) _
+
+@[simp]
+lemma integrableExpSet_id_binomial :
+    integrableExpSet id (binomial n p) = Set.univ := by
+  ext
+  simpa [integrableExpSet] using integrable_exp_mul_binomial _
+
+@[simp]
+lemma integrableExpSet_fun_id_binomial :
+    integrableExpSet (fun x ↦ x) (binomial n p) = Set.univ :=
+  integrableExpSet_id_binomial
+
+end CharacteristicFunction
 
 /-! ### Binomial random variables -/
 
