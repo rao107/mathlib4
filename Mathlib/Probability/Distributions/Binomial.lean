@@ -207,18 +207,73 @@ namespace CharacteristicFunction
 
 open scoped Real
 
-open Complex
+open Complex Measure
 
--- TODO: okay this is really hard. let's come back to this later...
+open Classical in
+private lemma cexp_mul_ncard_eq_finset_prod (z : ℂ) (s : Set ℕ) (hs : s ⊆ Set.Iio n) :
+    cexp (z * s.ncard) = ∏ i ∈ Finset.range n, if i ∈ s then cexp z else 1 := by
+  rw [mul_comm, exp_nat_mul, Finset.prod_ite, Finset.prod_const_one, mul_one, Finset.prod_const]
+  congr 1
+  rw [Set.ncard_eq_toFinset_card (hs := Set.Finite.subset (Set.finite_Iio n) hs)]
+  congr 1
+  ext i
+  simp only [Finset.mem_filter, Finset.mem_range, Set.Finite.mem_toFinset]
+  exact ⟨fun hi => ⟨hs hi, hi⟩, fun ⟨_, hi⟩ => hi⟩
+
+open Classical in
 theorem complexMGF_id_binomial (z : ℂ) :
     complexMGF id (binomial n p) z = (1 - p + p * cexp z) ^ n := by
+  let μ := fun i ↦ (unitInterval.toNNReal p • dirac (i ∈ Set.Iio n) +
+    unitInterval.toNNReal (σ p) • dirac False)
   calc complexMGF id (binomial n p) z
     _ = ∫ k, cexp (z * k) ∂Bin(ℝ, n, p) := by
       simp only [complexMGF, id_eq]
     _ = ∫ s, cexp (z * Set.ncard s) ∂setBer(Set.Iio n, p) := by
       rw [binomial, integral_map (by fun_prop) (by fun_prop)]
       simp only [Function.comp_apply, ofReal_natCast]
-    _ = (1 - p + p * cexp z) ^ n := by sorry
+    _ = ∫ f, cexp (z * Set.ncard {i | f i}) ∂(infinitePi μ) := by
+      rw [setBernoulli_eq_map, integral_map (by fun_prop) (by fun_prop)]
+    _ = ∫ f, ∏ i ∈ Finset.range n, (if f i then cexp z else 1) ∂(infinitePi μ) := by
+      apply integral_congr_ae
+      have : ∀ᵐ f ∂(infinitePi μ), {i | f i} ⊆ Set.Iio n := by
+        have key := setBernoulli_ae_subset (u := Set.Iio n) (p := p)
+        rw [setBernoulli_eq_map] at key
+        exact ae_of_ae_map (by fun_prop) key
+      filter_upwards [this] with f hf
+      exact cexp_mul_ncard_eq_finset_prod z _ hf
+    _ = ∫ h, ∏ i, (if h i then cexp z else 1)
+        ∂(Measure.pi fun i : Finset.range n ↦ μ i) := by
+      simp_rw [← Finset.prod_coe_sort (Finset.range n)]
+      have hm : Measurable (fun h : Finset.range n → Prop ↦
+          ∏ i, if h i then cexp z else 1) := by fun_prop
+      exact integral_restrict_infinitePi μ hm.aestronglyMeasurable
+    _ = (∫ x : Prop, (if x then cexp z else 1)
+        ∂(unitInterval.toNNReal p • dirac True +
+          unitInterval.toNNReal (σ p) • dirac False)) ^ n := by
+      have hμ : (fun i : Finset.range n ↦ μ i) = fun _ ↦
+          (unitInterval.toNNReal p • dirac True +
+           unitInterval.toNNReal (σ p) • dirac False : Measure Prop) := by
+        ext ⟨i, hi⟩ : 1
+        simp only [μ, Set.mem_Iio, Finset.mem_range.mp hi]
+      rw [hμ]
+      have key := integral_fintype_prod_eq_pow (ι := Finset.range n)
+        (fun x : Prop ↦ if x then cexp z else 1)
+        (μ := unitInterval.toNNReal p • dirac True + unitInterval.toNNReal (σ p) • dirac False)
+      simp only [Finset.card_range, Fintype.card_coe] at key ⊢
+      exact key
+    _ = (1 - p + p * cexp z) ^ n := by
+      congr 1
+      have h1 : Integrable (fun x : Prop ↦ if x then cexp z else 1)
+          (unitInterval.toNNReal p • dirac True) :=
+        (integrable_dirac (by simp)).smul_measure_nnreal
+      have h2 : Integrable (fun x : Prop ↦ if x then cexp z else 1)
+          (unitInterval.toNNReal (σ p) • dirac False) :=
+        (integrable_dirac (by simp)).smul_measure_nnreal
+      rw [integral_add_measure h1 h2, integral_smul_nnreal_measure, integral_smul_nnreal_measure]
+      simp only [integral_dirac, NNReal.smul_def, unitInterval.toNNReal, real_smul,
+        unitInterval.coe_symm_eq]
+      push_cast
+      ring
 
 theorem complexMGF_binomial {X : Ω → ℝ} (hX : P.map X = binomial n p) (z : ℂ) :
     complexMGF X P z = (1 - p + p * cexp z) ^ n := by
